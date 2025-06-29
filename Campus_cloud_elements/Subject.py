@@ -169,7 +169,7 @@ class Subject:
             for m in subj.materials:
                 materials.append({"subject": subj.name, "material": m})
 
-        excel_path = os.path.join(folder, output_file)  # ✅ Save Excel in the same folder
+        excel_path = os.path.join(folder, output_file)  
 
         with pd.ExcelWriter(excel_path) as writer:
             pd.DataFrame(subjects).to_excel(writer, sheet_name="Subjects", index=False)

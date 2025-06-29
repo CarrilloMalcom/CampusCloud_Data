@@ -160,11 +160,10 @@ class CampusCloudApp:
                 task_text = f"{estado} {task['Estado']} (Vence: {fecha})"
                 ttk.Label(task_frame, text=task_text).pack(side=tk.LEFT, padx=5)
 
-                # Botón para completar
+
                 complete_btn = ttk.Button(task_frame, text="✔", width=3, command=lambda idx=index: complete_task(idx))
                 complete_btn.pack(side=tk.RIGHT, padx=2)
 
-                # Botón para eliminar
                 delete_btn = ttk.Button(task_frame, text="✖", width=3, command=lambda idx=index: delete_task(idx))
                 delete_btn.pack(side=tk.RIGHT, padx=2)
 
@@ -172,10 +171,10 @@ class CampusCloudApp:
             if 0 <= index < len(subject.tasks):
                 task = subject.tasks[index]
                 subject.Completetasks(index)
-                subject.grades.append({"Tarea": task["Estado"], "Nota": ""})  # Agrega entrada vacía para calificación
+                subject.grades.append({"Tarea": task["Estado"], "Nota": ""})
                 subject.save_to_file()
                 refresh_tasks()
-                refresh_grades()  # Refresca panel de notas si está visible
+                refresh_grades()
 
         def delete_task(index):
             if 0 <= index < len(subject.tasks):

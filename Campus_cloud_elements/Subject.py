@@ -117,7 +117,13 @@ class Subject:
                     "DueDate": t["DueDate"].strftime("%Y-%m-%d")
                 } for t in self.__completed_tasks__
             ],
-            "grades": self.__grades__,
+            "grades": [
+                {
+                    "Tarea": g.get("Tarea", ""),
+                    "Nota": g.get("Nota", ""),
+                    "Peso": g.get("Peso", "")
+                } for g in self.__grades__ if isinstance(g, dict)
+            ],
             "materials": self.__material__.to_dict()
         }
         folder = "subjects_data"
@@ -143,9 +149,23 @@ class Subject:
                 "Completada": task["Completada"],
                 "DueDate": datetime.strptime(task["DueDate"], "%Y-%m-%d")
             })
-        subject.__grades__ = data["grades"]
-        subject.__material__ = MaterialTable()
-        subject.__material__.load_from_dict(data.get("materials", {}))
+
+        subject.__grades__ = []
+        for g in data["grades"]:
+            if isinstance(g, dict):
+                tarea = g.get("Tarea", "")
+                if isinstance(tarea, str) and tarea.startswith("{") and tarea.endswith("}"):
+                    try:
+                        import ast
+                        tarea_dict = ast.literal_eval(tarea)
+                        tarea = tarea_dict.get("Tarea", tarea)
+                    except:
+                        pass
+                subject.__grades__.append({
+                    "Tarea": tarea,
+                    "Nota": g.get("Nota", ""),
+                    "Peso": g.get("Peso", "")
+                })
         subject.__ToDoQueue__ = deque(sorted(subject.__tasks__, key=lambda x: x["DueDate"]))
         return subject
 
@@ -211,12 +231,16 @@ class Subject:
             subject = subjects_dict.get(row["subject"])
             if subject:
                 task = {"Estado": row["estado"], "Completada": True, "DueDate": datetime.strptime(row["fecha"], "%Y-%m-%d")}
-                subject._Subject__completed_tasks__.append(task)
+                subject.completed_tasks.append(task)
 
         for row in df_subjects["Grades"].to_dict("records"):
             subject = subjects_dict.get(row["subject"])
             if subject:
-                subject._Subject__grades__.append(row["grade"])
+                subject.grades.append({
+                    "Tarea": row.get("Tarea", row.get("grade", "")),
+                    "Nota": row.get("Nota", ""),
+                    "Peso": row.get("Peso", "")
+                })
 
         for row in df_subjects["Materials"].to_dict("records"):
             subject = subjects_dict.get(row["subject"])

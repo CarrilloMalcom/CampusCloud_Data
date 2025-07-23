@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import json
 import pandas as pd
+from Campus_cloud_elements.Material import MaterialTable
 
 
 class Subject:
@@ -11,10 +12,9 @@ class Subject:
         self.__tasks__ = []
         self.__completed_tasks__ = []
         self.__grades__ = []
-        self.__material__ = []
+        self.__material__ = MaterialTable()
         self.__credits__ = credits
         self.__ToDoQueue__ = deque()
-        self.__archived__ = archived
 
     @property
     def name(self):
@@ -40,14 +40,6 @@ class Subject:
     def materials(self):
         return self.__material__
 
-    @property
-    def archived(self):
-        return self.__archived__
-
-    @archived.setter
-    def archived(self, value):
-        self.__archived__ = value
-
     def addTask(self, task, DueDate):
         if not isinstance(DueDate, datetime):
             try: 
@@ -55,7 +47,7 @@ class Subject:
             except ValueError:
                 print("Formato de fecha incorrecto. Debe ser: YYYY-MM-DD.")
                 return None
-            
+
         Task_info = {"Estado": task, "Completada": False, "DueDate": DueDate}
         self.__tasks__.append(Task_info)
         self.__tasks__.sort(key=lambda x: x["DueDate"])
@@ -66,7 +58,7 @@ class Subject:
         self.__ToDoQueue__ = deque(converter)
 
         self.save_to_file()
-        
+
     def Completetasks(self, Index):   
         if 0 <= Index < len(self.__tasks__):
             task = self.__tasks__.pop(Index)  
@@ -79,9 +71,8 @@ class Subject:
                 pass
         else:
             print("No Existe la tarea")
-            
-        self.save_to_file()
 
+        self.save_to_file()
 
     def DeleteTask(self, Index):
         if 0 <= Index < len(self.__tasks__):
@@ -96,44 +87,50 @@ class Subject:
 
         self.save_to_file()
 
+    def addMaterial(self, name, link):
+        if name and link:
+            self.__material__.add(name, link)
+            self.save_to_file()
 
     @property 
     def Subjectcredits(self):
         return self.__credits__ 
-    
+
+    def addMaterialFromImport(self, name, link):
+        self.__material__.add(name, link)
+
     def save_to_file(self):
-            data = {
-                "name": self.__name__,
-                "credits": self.__credits__,
-                "archived": self.__archived__,
-                "tasks": [
-                    {
-                        "Estado": t["Estado"],
-                        "Completada": t["Completada"],
-                        "DueDate": t["DueDate"].strftime("%Y-%m-%d")
-                    } for t in self.__tasks__
-                ],
-                "completed_tasks": [
-                    {
-                        "Estado": t["Estado"],
-                        "Completada": t["Completada"],
-                        "DueDate": t["DueDate"].strftime("%Y-%m-%d")
-                    } for t in self.__completed_tasks__
-                ],
-                "grades": self.__grades__,
-                "materials": self.__material__
-            }
-            folder = "subjects_data"
-            os.makedirs(folder, exist_ok=True)
-            filename = os.path.join(folder, f"{self.__name__}.txt")
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4)
+        data = {
+            "name": self.__name__,
+            "credits": self.__credits__,
+            "tasks": [
+                {
+                    "Estado": t["Estado"],
+                    "Completada": t["Completada"],
+                    "DueDate": t["DueDate"].strftime("%Y-%m-%d")
+                } for t in self.__tasks__
+            ],
+            "completed_tasks": [
+                {
+                    "Estado": t["Estado"],
+                    "Completada": t["Completada"],
+                    "DueDate": t["DueDate"].strftime("%Y-%m-%d")
+                } for t in self.__completed_tasks__
+            ],
+            "grades": self.__grades__,
+            "materials": self.__material__.to_dict()
+        }
+        folder = "subjects_data"
+        os.makedirs(folder, exist_ok=True)
+        filename = os.path.join(folder, f"{self.__name__}.txt")
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
 
     @staticmethod
     def load_from_file(filename):
         with open(filename, "r", encoding="utf-8") as f:
             data = json.load(f)
-        subject = Subject(data["name"], data["credits"], data.get("archived", False))
+        subject = Subject(data["name"], data["credits"])
         for task in data["tasks"]:
             subject.__tasks__.append({
                 "Estado": task["Estado"],
@@ -147,14 +144,13 @@ class Subject:
                 "DueDate": datetime.strptime(task["DueDate"], "%Y-%m-%d")
             })
         subject.__grades__ = data["grades"]
-        subject.__material__ = data["materials"]
+        subject.__material__ = MaterialTable()
+        subject.__material__.load_from_dict(data.get("materials", {}))
         subject.__ToDoQueue__ = deque(sorted(subject.__tasks__, key=lambda x: x["DueDate"]))
         return subject
 
     @staticmethod
     def export_all_to_excel(folder="subjects_data", output_file="subjects_data.xlsx"):
-        import pandas as pd
-
         subjects = []
         tasks = []
         completed = []
@@ -169,17 +165,17 @@ class Subject:
                 continue
             path = os.path.join(folder, file)
             subj = Subject.load_from_file(path)
-            subjects.append({"name": subj.name, "credits": subj.credits, "archived": subj.archived})
+            subjects.append({"name": subj.name, "credits": subj.credits})
             for t in subj.tasks:
                 tasks.append({"subject": subj.name, "estado": t["Estado"], "completada": t["Completada"], "fecha": t["DueDate"].strftime("%Y-%m-%d")})
             for t in subj.completed_tasks:
                 completed.append({"subject": subj.name, "estado": t["Estado"], "completada": t["Completada"], "fecha": t["DueDate"].strftime("%Y-%m-%d")})
             for g in subj.grades:
                 grades.append({"subject": subj.name, "grade": g})
-            for m in subj.materials:
-                materials.append({"subject": subj.name, "material": m})
+            for name, link in subj.materials.items():
+                materials.append({"subject": subj.name, "material_name": name, "material_link": link})
 
-        excel_path = os.path.join(folder, output_file)  
+        excel_path = os.path.join(folder, output_file)
 
         with pd.ExcelWriter(excel_path) as writer:
             pd.DataFrame(subjects).to_excel(writer, sheet_name="Subjects", index=False)
@@ -203,8 +199,7 @@ class Subject:
         subjects_dict = {}
 
         for row in df_subjects["Subjects"].to_dict("records"):
-            archived_flag = row.get("archived", False)
-            subject = Subject(row["name"], row["credits"], archived=archived_flag)
+            subject = Subject(row["name"], row["credits"])
             subjects_dict[row["name"]] = subject
 
         for row in df_subjects["Tasks"].to_dict("records"):
@@ -226,12 +221,7 @@ class Subject:
         for row in df_subjects["Materials"].to_dict("records"):
             subject = subjects_dict.get(row["subject"])
             if subject:
-                subject._Subject__material__.append(row["material"])
+                subject.addMaterialFromImport(row["material_name"], row["material_link"])
 
         for subject in subjects_dict.values():
             subject.save_to_file()
-
-
-
-    def addMaterial(self):
-        pass

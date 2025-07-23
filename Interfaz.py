@@ -244,6 +244,7 @@ class CampusCloudApp:
     def descargar_y_abrir_material(self, link):
         from Campus_cloud_elements.Material import descargar_y_abrir_desde_drive
         descargar_y_abrir_desde_drive(link)
+    
     def create_section_with_add(self, frame, section_name, item_list, add_callback=None):
         items_frame = ttk.Frame(frame)
         items_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -256,40 +257,65 @@ class CampusCloudApp:
                 for name, link in item_list.items():
                     item_frame = ttk.Frame(items_frame)
                     item_frame.pack(fill=tk.X, pady=2)
-
                     ttk.Label(item_frame, text=name).pack(side=tk.LEFT, padx=5)
-
                     open_button = ttk.Button(item_frame, text="Abrir", width=6, command=lambda l=link: self.descargar_y_abrir_material(l))
                     open_button.pack(side=tk.RIGHT)
-
                     delete_button = ttk.Button(item_frame, text="✖", width=3, command=lambda n=name: eliminar_material(n))
                     delete_button.pack(side=tk.RIGHT, padx=(0, 5))
-            else:
+
+            elif section_name == "Nota":
                 for idx, item in enumerate(item_list):
                     item_frame = ttk.Frame(items_frame)
                     item_frame.pack(fill=tk.X, pady=2)
 
-                    if isinstance(item, dict) and "Tarea" in item:
-                        ttk.Label(item_frame, text=f"{item['Tarea']}").pack(side=tk.LEFT, padx=5)
-                        entry = ttk.Entry(item_frame, width=5)
-                        entry.insert(0, item['Nota'])
-                        entry.pack(side=tk.LEFT, padx=5)
+                    is_editing = tk.BooleanVar(value=False)
 
-                        def update_grade(e, i=idx):
-                            item_list[i]["Nota"] = entry.get()
-                            if self.current_subject:
-                                self.current_subject.save_to_file()
+                    tarea_lbl = ttk.Label(item_frame, text=f"{item.get('Tarea', f'Tarea {idx+1}')}")
+                    tarea_lbl.pack(side=tk.LEFT, padx=5)
 
-                        entry.bind("<FocusOut>", update_grade)
-                    else:
-                        ttk.Label(item_frame, text=str(item)).pack(anchor=tk.W)
+                    nota_var = tk.StringVar(value=item.get("Nota", ""))
+                    peso_var = tk.StringVar(value=item.get("Peso", ""))
 
+                    nota_entry = ttk.Entry(item_frame, width=5, textvariable=nota_var, state="disabled")
+                    peso_entry = ttk.Entry(item_frame, width=5, textvariable=peso_var, state="disabled")
+
+                    def toggle_edit(entry1=nota_entry, entry2=peso_entry, var=is_editing):
+                        if var.get():
+                            entry1.configure(state="disabled")
+                            entry2.configure(state="disabled")
+                            var.set(False)
+                        else:
+                            entry1.configure(state="normal")
+                            entry2.configure(state="normal")
+                            var.set(True)
+
+                    def guardar(idx=idx, e1=nota_entry, e2=peso_entry):
+                        item_list[idx]["Nota"] = e1.get()
+                        item_list[idx]["Peso"] = e2.get()
+                        if self.current_subject:
+                            self.current_subject.save_to_file()
+                        toggle_edit()
+
+                    ttk.Label(item_frame, text="Nota:").pack(side=tk.LEFT)
+                    nota_entry.pack(side=tk.LEFT, padx=2)
+                    ttk.Label(item_frame, text="Peso %:").pack(side=tk.LEFT)
+                    peso_entry.pack(side=tk.LEFT, padx=2)
+
+                    ttk.Button(item_frame, text="Editar", command=toggle_edit).pack(side=tk.LEFT, padx=2)
+                    ttk.Button(item_frame, text="Guardar", command=guardar).pack(side=tk.LEFT, padx=2)
+
+            else:
+                for idx, item in enumerate(item_list):
+                    item_frame = ttk.Frame(items_frame)
+                    item_frame.pack(fill=tk.X, pady=2)
+                    ttk.Label(item_frame, text=str(item)).pack(anchor=tk.W)
 
         def eliminar_material(nombre):
             item_list.remove(nombre)
             if self.current_subject:
                 self.current_subject.save_to_file()
             refresh_items()
+
         refresh_items()
 
         add_frame = ttk.Frame(frame)
@@ -299,7 +325,6 @@ class CampusCloudApp:
             ttk.Label(add_frame, text="Nombre:").pack(side=tk.LEFT)
             name_entry = ttk.Entry(add_frame, width=20)
             name_entry.pack(side=tk.LEFT, padx=5)
-
             ttk.Label(add_frame, text="Link:").pack(side=tk.LEFT)
             link_entry = ttk.Entry(add_frame)
             link_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
@@ -317,25 +342,31 @@ class CampusCloudApp:
 
             ttk.Button(add_frame, text="+", command=add_item).pack(side=tk.LEFT)
 
-        else:
-            ttk.Label(add_frame, text=f"Agregar {section_name}:").pack(side=tk.LEFT)
-            entry = ttk.Entry(add_frame)
-            entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+        elif section_name == "Nota":
+            ttk.Label(add_frame, text="Nombre:").pack(side=tk.LEFT)
+            nombre_entry = ttk.Entry(add_frame, width=15)
+            nombre_entry.pack(side=tk.LEFT, padx=5)
+            ttk.Label(add_frame, text="Nota:").pack(side=tk.LEFT)
+            nota_entry = ttk.Entry(add_frame, width=5)
+            nota_entry.pack(side=tk.LEFT, padx=5)
+            ttk.Label(add_frame, text="Peso %:").pack(side=tk.LEFT)
+            peso_entry = ttk.Entry(add_frame, width=5)
+            peso_entry.pack(side=tk.LEFT, padx=5)
 
-            def add_item():
-                text = entry.get()
-                if text:
-                    if add_callback:
-                        add_callback(text)
-                    else:
-                        item_list.append(text)
-                        if isinstance(self.current_subject, Subject):
-                            self.current_subject.save_to_file()
+            def add_manual_nota():
+                nombre = nombre_entry.get().strip()
+                nota = nota_entry.get().strip()
+                peso = peso_entry.get().strip()
+                if nombre and nota:
+                    item_list.append({"Tarea": nombre, "Nota": nota, "Peso": peso})
+                    if self.current_subject:
+                        self.current_subject.save_to_file()
                     refresh_items()
-                    entry.delete(0, tk.END)
+                    nombre_entry.delete(0, tk.END)
+                    nota_entry.delete(0, tk.END)
+                    peso_entry.delete(0, tk.END)
 
-            ttk.Button(add_frame, text="+", command=add_item).pack(side=tk.LEFT)
-
+            ttk.Button(add_frame, text="+", command=add_manual_nota).pack(side=tk.LEFT)
 if __name__ == "__main__":
     
 

@@ -14,6 +14,7 @@ class Subject:
         self.__material__ = []
         self.__credits__ = credits
         self.__ToDoQueue__ = deque()
+        self.__archived__ = archived
 
     @property
     def name(self):
@@ -38,6 +39,14 @@ class Subject:
     @property
     def materials(self):
         return self.__material__
+
+    @property
+    def archived(self):
+        return self.__archived__
+
+    @archived.setter
+    def archived(self, value):
+        self.__archived__ = value
 
     def addTask(self, task, DueDate):
         if not isinstance(DueDate, datetime):
@@ -96,6 +105,7 @@ class Subject:
             data = {
                 "name": self.__name__,
                 "credits": self.__credits__,
+                "archived": self.__archived__,
                 "tasks": [
                     {
                         "Estado": t["Estado"],
@@ -123,7 +133,7 @@ class Subject:
     def load_from_file(filename):
         with open(filename, "r", encoding="utf-8") as f:
             data = json.load(f)
-        subject = Subject(data["name"], data["credits"])
+        subject = Subject(data["name"], data["credits"], data.get("archived", False))
         for task in data["tasks"]:
             subject.__tasks__.append({
                 "Estado": task["Estado"],
@@ -159,7 +169,7 @@ class Subject:
                 continue
             path = os.path.join(folder, file)
             subj = Subject.load_from_file(path)
-            subjects.append({"name": subj.name, "credits": subj.credits})
+            subjects.append({"name": subj.name, "credits": subj.credits, "archived": subj.archived})
             for t in subj.tasks:
                 tasks.append({"subject": subj.name, "estado": t["Estado"], "completada": t["Completada"], "fecha": t["DueDate"].strftime("%Y-%m-%d")})
             for t in subj.completed_tasks:
@@ -193,7 +203,8 @@ class Subject:
         subjects_dict = {}
 
         for row in df_subjects["Subjects"].to_dict("records"):
-            subject = Subject(row["name"], row["credits"])
+            archived_flag = row.get("archived", False)
+            subject = Subject(row["name"], row["credits"], archived=archived_flag)
             subjects_dict[row["name"]] = subject
 
         for row in df_subjects["Tasks"].to_dict("records"):

@@ -123,25 +123,58 @@ class CampusCloudApp:
 
     def show_home_view(self):
         self.clear_content_frame()
-        self.current_subject = None
-        if not self.subjects:
-            welcome_label = ttk.Label(self.content_frame, text="Bienvenido a CampusCloud\n\nHaz clic en el botón + para agregar una materia", font=('Arial', 14), justify='center')
-            welcome_label.pack(expand=True, pady=100)
-        for subject in self.subjects:
-            self.display_subject(subject)
+        self.show_active = tk.BooleanVar(value=True)
+        self.show_archived = tk.BooleanVar(value=False) 
+        self.subjects_frame = ttk.Frame(self.content_frame)
+        self.subjects_frame.pack(fill=tk.BOTH, expand=True)
+        self.display_subjects()
 
     def clear_content_frame(self):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-    def display_subject(self, subject):
-        subject_frame = ttk.Frame(self.content_frame, style='TFrame', padding=10, relief='groove', borderwidth=2)
-        subject_frame.pack(fill=tk.X, pady=5, padx=10)
+    def display_subjects(self, query=""):
+        for widget in self.subjects_frame.winfo_children():
+            widget.destroy()
+        active_subjects = [s for s in self.subjects if not s.archived]
+        archived_subjects = [s for s in self.subjects if s.archived]
+        active_toggle_btn = ttk.Checkbutton(
+            self.subjects_frame, text="Materias Activas",
+            variable=self.show_active, command=self.display_subjects,
+            style="Toolbutton"
+        )
+        active_toggle_btn.pack(anchor='w', padx=10, pady=(5, 0))
+        if self.show_active.get():
+            for s in active_subjects:
+                self.display_subject(s, archived=False)
+        archived_toggle_btn = ttk.Checkbutton(
+            self.subjects_frame, text="Materias Archivadas",
+            variable=self.show_archived, command=self.display_subjects,
+            style="Toolbutton"
+        )
+        archived_toggle_btn.pack(anchor='w', padx=10, pady=(15, 0))
+        if self.show_archived.get():
+            for s in archived_subjects:
+                self.display_subject(s, archived=True)
+                
+    def display_subject(self, subject, archived=False):
+        subject_frame = ttk.Frame(self.subjects_frame, style='TFrame', padding=10, relief='groove', borderwidth=2)
+        subject_frame.pack(fill=tk.X, pady=5, padx=20)
         info_frame = ttk.Frame(subject_frame)
         info_frame.pack(fill=tk.X)
         ttk.Label(info_frame, text=f"Materia: {subject.name}", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
         ttk.Label(info_frame, text=f"Créditos: {subject.credits}", font=('Arial', 12)).pack(side=tk.RIGHT)
-        ttk.Button(subject_frame, text="Ver Detalles", command=lambda s=subject: self.show_subject_detail_view(s)).pack(pady=(10, 0))
+        button_frame = ttk.Frame(subject_frame)
+        button_frame.pack(fill=tk.X, pady=(5, 0))
+        ttk.Button(button_frame, text="Ver Detalles", command=lambda s=subject: self.show_subject_detail_view(s)).pack(side=tk.LEFT)
+        archive_text = "Desarchivar" if archived else "Archivar"
+        archive_button = ttk.Button(button_frame, text=archive_text, command=lambda s=subject: self.toggle_archive_subject(s))
+        archive_button.pack(side=tk.RIGHT)
+
+    def toggle_archive_subject(self, subject):
+        subject.archived = not subject.archived
+        subject.save_to_file()
+        self.show_home_view()
 
     def create_task_section(self, frame, subject, refresh_grades=None):
         items_frame = ttk.Frame(frame)

@@ -3,6 +3,9 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 from Campus_cloud_elements.Subject import Subject
 from Campus_cloud_elements.Users import User
+from Campus_cloud_elements.Material import MaterialTable
+from Campus_cloud_elements.DriveSync_OAuth import upload_excel_to_drive, download_excel_from_drive
+from Campus_cloud_elements.Subject import Subject
 import os
 import pandas as pd
 
@@ -19,8 +22,7 @@ class CampusCloudApp:
         Subject.import_all_from_excel()
         self.load_all_subjects()
         self.show_home_view()
-        
-    
+
     def load_all_subjects(self):
         folder = "subjects_data"
         if not os.path.exists(folder):
@@ -34,9 +36,6 @@ class CampusCloudApp:
                 except Exception as e:
                     print(f"Error cargando {file}: {e}")
 
-
-
-
     def configure_styles(self):
         self.style = ttk.Style()
         self.style.theme_use('clam')
@@ -46,8 +45,8 @@ class CampusCloudApp:
         self.style.configure('TButton', font=('Arial', 10), padding=5)
         self.style.configure('Save.TButton', background="#231C1C", foreground='white', font=('Arial', 6, 'bold'), borderwidth=2, relief='raised')
         self.style.configure('Cancel.TButton', background="#231C1C", foreground='white', font=('Arial', 6, 'bold'), borderwidth=2, relief='raised')
-        self.style.map('Save.TButton', background=[('active', "#000000")])  
-        self.style.map('Cancel.TButton', background=[('active', "#000000")])  
+        self.style.map('Save.TButton', background=[('active', "#000000")])
+        self.style.map('Cancel.TButton', background=[('active', "#000000")])
         self.style.configure('TEntry', foreground='white', fieldbackground='#222222', insertbackground='white', bordercolor='#444444', lightcolor='#444444', darkcolor='#444444')
 
     def create_main_structure(self):
@@ -57,14 +56,14 @@ class CampusCloudApp:
         self.content_frame = ttk.Frame(self.main_frame)
         self.content_frame.pack(fill=tk.BOTH, expand=True)
         self.create_footer()
-    
+
     def create_header(self):
         self.header_frame = ttk.Frame(self.main_frame, style='Header.TFrame')
         self.header_frame.pack(fill=tk.X)
         self.title_label = ttk.Label(self.header_frame, text="CampusCloud", style='Header.TLabel', cursor="hand2")
         self.title_label.pack(side=tk.LEFT, padx=20, pady=15)
         self.title_label.bind("<Button-1>", lambda e: self.show_home_view())
-    
+
     def create_footer(self):
         self.footer_frame = ttk.Frame(self.main_frame)
         self.footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
@@ -123,58 +122,56 @@ class CampusCloudApp:
 
     def show_home_view(self):
         self.clear_content_frame()
-        self.show_active = tk.BooleanVar(value=True)
-        self.show_archived = tk.BooleanVar(value=False) 
-        self.subjects_frame = ttk.Frame(self.content_frame)
-        self.subjects_frame.pack(fill=tk.BOTH, expand=True)
-        self.display_subjects()
+        self.current_subject = None
+        if not self.subjects:
+            welcome_label = ttk.Label(self.content_frame, text="Bienvenido a CampusCloud\n\nHaz clic en el botón + para agregar una materia", font=('Arial', 14), justify='center')
+            welcome_label.pack(expand=True, pady=100)
+        for subject in self.subjects:
+            self.display_subject(subject)
 
     def clear_content_frame(self):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-    def display_subjects(self, query=""):
-        for widget in self.subjects_frame.winfo_children():
-            widget.destroy()
-        active_subjects = [s for s in self.subjects if not s.archived]
-        archived_subjects = [s for s in self.subjects if s.archived]
-        active_toggle_btn = ttk.Checkbutton(
-            self.subjects_frame, text="Materias Activas",
-            variable=self.show_active, command=self.display_subjects,
-            style="Toolbutton"
-        )
-        active_toggle_btn.pack(anchor='w', padx=10, pady=(5, 0))
-        if self.show_active.get():
-            for s in active_subjects:
-                self.display_subject(s, archived=False)
-        archived_toggle_btn = ttk.Checkbutton(
-            self.subjects_frame, text="Materias Archivadas",
-            variable=self.show_archived, command=self.display_subjects,
-            style="Toolbutton"
-        )
-        archived_toggle_btn.pack(anchor='w', padx=10, pady=(15, 0))
-        if self.show_archived.get():
-            for s in archived_subjects:
-                self.display_subject(s, archived=True)
-                
-    def display_subject(self, subject, archived=False):
-        subject_frame = ttk.Frame(self.subjects_frame, style='TFrame', padding=10, relief='groove', borderwidth=2)
-        subject_frame.pack(fill=tk.X, pady=5, padx=20)
+    def display_subject(self, subject):
+        subject_frame = ttk.Frame(self.content_frame, style='TFrame', padding=10, relief='groove', borderwidth=2)
+        subject_frame.pack(fill=tk.X, pady=5, padx=10)
         info_frame = ttk.Frame(subject_frame)
         info_frame.pack(fill=tk.X)
         ttk.Label(info_frame, text=f"Materia: {subject.name}", font=('Arial', 12, 'bold')).pack(side=tk.LEFT)
         ttk.Label(info_frame, text=f"Créditos: {subject.credits}", font=('Arial', 12)).pack(side=tk.RIGHT)
-        button_frame = ttk.Frame(subject_frame)
-        button_frame.pack(fill=tk.X, pady=(5, 0))
-        ttk.Button(button_frame, text="Ver Detalles", command=lambda s=subject: self.show_subject_detail_view(s)).pack(side=tk.LEFT)
-        archive_text = "Desarchivar" if archived else "Archivar"
-        archive_button = ttk.Button(button_frame, text=archive_text, command=lambda s=subject: self.toggle_archive_subject(s))
-        archive_button.pack(side=tk.RIGHT)
+        ttk.Button(subject_frame, text="Ver Detalles", command=lambda s=subject: self.show_subject_detail_view(s)).pack(pady=(10, 0))
 
-    def toggle_archive_subject(self, subject):
-        subject.archived = not subject.archived
-        subject.save_to_file()
-        self.show_home_view()
+    def show_subject_detail_view(self, subject):
+        self.clear_content_frame()
+        self.current_subject = subject
+        ttk.Button(self.content_frame, text="Volver", command=self.show_home_view).pack(anchor=tk.W, padx=10, pady=10)
+
+        header_frame = ttk.Frame(self.content_frame)
+        header_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(header_frame, text=f"Materia: {subject.name}", font=('Arial', 16, 'bold')).pack(side=tk.LEFT)
+        ttk.Label(header_frame, text=f"Créditos: {subject.credits}", font=('Arial', 14)).pack(side=tk.RIGHT)
+
+        notebook = ttk.Notebook(self.content_frame)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        grades_tab = ttk.Frame(notebook)
+        notebook.add(grades_tab, text="Notas")
+
+        def refresh_grades():
+            for widget in grades_tab.winfo_children():
+                widget.destroy()
+            self.create_section_with_add(grades_tab, "Nota", subject.grades)
+
+        refresh_grades()
+
+        assignments_tab = ttk.Frame(notebook)
+        notebook.add(assignments_tab, text="Tareas Pendientes")
+        self.create_task_section(assignments_tab, subject, refresh_grades)
+
+        materials_tab = ttk.Frame(notebook)
+        notebook.add(materials_tab, text="Material de Estudio")
+        self.create_section_with_add(materials_tab, "Material", subject.materials)
 
     def create_task_section(self, frame, subject, refresh_grades=None):
         items_frame = ttk.Frame(frame)
@@ -192,7 +189,6 @@ class CampusCloudApp:
                 fecha = task["DueDate"].strftime('%Y-%m-%d')
                 task_text = f"{estado} {task['Estado']} (Vence: {fecha})"
                 ttk.Label(task_frame, text=task_text).pack(side=tk.LEFT, padx=5)
-
 
                 complete_btn = ttk.Button(task_frame, text="✔", width=3, command=lambda idx=index: complete_task(idx))
                 complete_btn.pack(side=tk.RIGHT, padx=2)
@@ -214,8 +210,6 @@ class CampusCloudApp:
                 subject.DeleteTask(index)
                 subject.save_to_file()
                 refresh_tasks()
-
-
 
         refresh_tasks()
 
@@ -246,38 +240,10 @@ class CampusCloudApp:
 
         ttk.Button(add_frame, text="+", command=add_task).pack(side=tk.LEFT)
 
-    def show_subject_detail_view(self, subject):
-        self.clear_content_frame()
-        self.current_subject = subject
-        ttk.Button(self.content_frame, text="Volver", command=self.show_home_view).pack(anchor=tk.W, padx=10, pady=10)
 
-        header_frame = ttk.Frame(self.content_frame)
-        header_frame.pack(fill=tk.X, padx=10, pady=5)
-        ttk.Label(header_frame, text=f"Materia: {subject.name}", font=('Arial', 16, 'bold')).pack(side=tk.LEFT)
-        ttk.Label(header_frame, text=f"Créditos: {subject.credits}", font=('Arial', 14)).pack(side=tk.RIGHT)
-
-        notebook = ttk.Notebook(self.content_frame)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        grades_tab = ttk.Frame(notebook)
-        notebook.add(grades_tab, text="Notas")
-
-        def refresh_grades():
-            for widget in grades_tab.winfo_children():
-                widget.destroy()
-            self.create_section_with_add(grades_tab, "Nota", subject.grades)
-
-        refresh_grades()  
-
-
-        assignments_tab = ttk.Frame(notebook)
-        notebook.add(assignments_tab, text="Tareas Pendientes")
-        self.create_task_section(assignments_tab, subject, refresh_grades)
-
-        materials_tab = ttk.Frame(notebook)
-        notebook.add(materials_tab, text="Material de Estudio")
-        self.create_section_with_add(materials_tab, "Material", subject.materials)
-
+    def descargar_y_abrir_material(self, link):
+        from Campus_cloud_elements.Material import descargar_y_abrir_desde_drive
+        descargar_y_abrir_desde_drive(link)
     def create_section_with_add(self, frame, section_name, item_list, add_callback=None):
         items_frame = ttk.Frame(frame)
         items_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -285,53 +251,106 @@ class CampusCloudApp:
         def refresh_items():
             for widget in items_frame.winfo_children():
                 widget.destroy()
-            for idx, item in enumerate(item_list):
-                item_frame = ttk.Frame(items_frame)
-                item_frame.pack(fill=tk.X, pady=2)
 
-                if isinstance(item, dict) and "Tarea" in item:
-                    ttk.Label(item_frame, text=f"{item['Tarea']}").pack(side=tk.LEFT, padx=5)
-                    entry = ttk.Entry(item_frame, width=5)
-                    entry.insert(0, item['Nota'])
-                    entry.pack(side=tk.LEFT, padx=5)
+            if section_name == "Material" and hasattr(item_list, "items"):
+                for name, link in item_list.items():
+                    item_frame = ttk.Frame(items_frame)
+                    item_frame.pack(fill=tk.X, pady=2)
 
-                    def update_grade(e, i=idx):
-                        item_list[i]["Nota"] = entry.get()
-                        if self.current_subject:
-                            self.current_subject.save_to_file()
+                    ttk.Label(item_frame, text=name).pack(side=tk.LEFT, padx=5)
 
-                    entry.bind("<FocusOut>", update_grade)
-                else:
-                    ttk.Label(item_frame, text=str(item)).pack(anchor=tk.W)
+                    open_button = ttk.Button(item_frame, text="Abrir", width=6, command=lambda l=link: self.descargar_y_abrir_material(l))
+                    open_button.pack(side=tk.RIGHT)
 
+                    delete_button = ttk.Button(item_frame, text="✖", width=3, command=lambda n=name: eliminar_material(n))
+                    delete_button.pack(side=tk.RIGHT, padx=(0, 5))
+            else:
+                for idx, item in enumerate(item_list):
+                    item_frame = ttk.Frame(items_frame)
+                    item_frame.pack(fill=tk.X, pady=2)
+
+                    if isinstance(item, dict) and "Tarea" in item:
+                        ttk.Label(item_frame, text=f"{item['Tarea']}").pack(side=tk.LEFT, padx=5)
+                        entry = ttk.Entry(item_frame, width=5)
+                        entry.insert(0, item['Nota'])
+                        entry.pack(side=tk.LEFT, padx=5)
+
+                        def update_grade(e, i=idx):
+                            item_list[i]["Nota"] = entry.get()
+                            if self.current_subject:
+                                self.current_subject.save_to_file()
+
+                        entry.bind("<FocusOut>", update_grade)
+                    else:
+                        ttk.Label(item_frame, text=str(item)).pack(anchor=tk.W)
+
+
+        def eliminar_material(nombre):
+            item_list.remove(nombre)
+            if self.current_subject:
+                self.current_subject.save_to_file()
+            refresh_items()
         refresh_items()
 
         add_frame = ttk.Frame(frame)
         add_frame.pack(fill=tk.X, padx=10, pady=10)
-        ttk.Label(add_frame, text=f"Agregar {section_name}:").pack(side=tk.LEFT)
-        entry = ttk.Entry(add_frame)
-        entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
 
-        def add_item():
-            text = entry.get()
-            if text:
-                if add_callback:
-                    add_callback(text)
-                else:
-                    item_list.append(text)
-                    if isinstance(self.current_subject, Subject):
+        if section_name == "Material":
+            ttk.Label(add_frame, text="Nombre:").pack(side=tk.LEFT)
+            name_entry = ttk.Entry(add_frame, width=20)
+            name_entry.pack(side=tk.LEFT, padx=5)
+
+            ttk.Label(add_frame, text="Link:").pack(side=tk.LEFT)
+            link_entry = ttk.Entry(add_frame)
+            link_entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+
+            def add_item():
+                name = name_entry.get().strip()
+                link = link_entry.get().strip()
+                if name and link:
+                    item_list.add(name, link)
+                    if self.current_subject:
                         self.current_subject.save_to_file()
-                refresh_items()
-                entry.delete(0, tk.END)
+                    refresh_items()
+                    name_entry.delete(0, tk.END)
+                    link_entry.delete(0, tk.END)
 
-        ttk.Button(add_frame, text="+", command=add_item).pack(side=tk.LEFT)
+            ttk.Button(add_frame, text="+", command=add_item).pack(side=tk.LEFT)
 
+        else:
+            ttk.Label(add_frame, text=f"Agregar {section_name}:").pack(side=tk.LEFT)
+            entry = ttk.Entry(add_frame)
+            entry.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=5)
+
+            def add_item():
+                text = entry.get()
+                if text:
+                    if add_callback:
+                        add_callback(text)
+                    else:
+                        item_list.append(text)
+                        if isinstance(self.current_subject, Subject):
+                            self.current_subject.save_to_file()
+                    refresh_items()
+                    entry.delete(0, tk.END)
+
+            ttk.Button(add_frame, text="+", command=add_item).pack(side=tk.LEFT)
 
 if __name__ == "__main__":
+    
+
     def on_close():
-        from Campus_cloud_elements.Subject import Subject
         Subject.export_all_to_excel()
+        try:
+            upload_excel_to_drive()
+        except Exception as e:
+            print(f"Error subiendo a Drive: {e}")
         root.destroy()
+
+    try:
+        download_excel_from_drive()
+    except Exception as e:
+        print(f"Error descargando desde Drive: {e}")
 
     root = tk.Tk()
     app = CampusCloudApp(root)
